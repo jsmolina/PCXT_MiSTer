@@ -19,7 +19,7 @@ The [Graphics Gremlin project](https://github.com/schlae/graphics-gremlin) from 
 ## Key features
 
 * 8088 CPU with these speed settings: 4.77 MHz, 7.16 MHz, 9.54 MHz cycle accurate, and PC/AT 286 at 3.5MHz equivalent (max. speed)
-* Support for IBM PCXT 5160 and clones (CGA graphics)
+* Support for IBM PCXT 5160 and clones (CGA graphics and EGA)
 * Main memory 640Kb + 384Kb UMB memory
 * Simulated Composite Video (CGA)
 * Simultaneous video Hercules Graphics Card, F11 -> Swap Video Output with CGA

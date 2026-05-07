@@ -275,6 +275,7 @@ module emu
 		"P1-;",
 		CONF_STR_ROM,
 		"P1FC2,ROM,EC00 BIOS:;",
+		"P1FC3,ROM,EGA BIOS:;",
 		"P1-;",
 		"P1OUV,BIOS Writable,None,EC00,Main,All;",
 		"P1-;",	
@@ -360,6 +361,7 @@ module emu
     wire        video_scandoubler_en = (scale_video_ff > 0) || forced_scandoubler;
     wire        cga_scandouble_en = video_scandoubler_en;
     reg         hercules_hw;
+    wire [15:0] status_menumask = {12'd0, ega_enabled, ega_enabled, status[5]};
 
     wire VGA_VBlank_border;
     wire std_hsyncwidth;
@@ -392,7 +394,7 @@ module emu
 
 		.buttons(buttons),
 		.status(status),
-		.status_menumask({status[5]}),
+		.status_menumask(status_menumask),
 
 		.ps2_kbd_clk_in		(ps2_kbd_clk_out),
 		.ps2_kbd_data_in	(ps2_kbd_data_out),
@@ -648,7 +650,7 @@ module emu
     //
 
     reg [4:0]  bios_load_state = 4'h0;
-    reg [1:0]  bios_protect_flag;
+    reg [2:0]  bios_protect_flag;
     reg        bios_access_request;
     reg [19:0] bios_access_address;
     reg [15:0] bios_write_data;
@@ -659,19 +661,21 @@ module emu
     wire select_pcxt  = (ioctl_index[5:0] == 0) && (ioctl_addr[24:16] == 9'b000000000);
     wire select_tandy = `ROM_IS_TANDY ? (ioctl_index[5:0] == 1) && (ioctl_addr[24:16] == 9'b000000000) : 1'b0;
     wire select_xtide = ioctl_index == 2;
+    wire select_ega_bios = (ioctl_index[5:0] == 3) && (ioctl_addr[24:16] == 9'b000000000);
 
     wire [19:0] bios_access_address_wire = select_pcxt  ? { 4'b1111, ioctl_addr[15:0]} :
          select_tandy ? { 4'b1111, ioctl_addr[15:0]} :
          select_xtide ? { 6'b111011, ioctl_addr[13:0]} :
+         select_ega_bios ? { 4'b1100, ioctl_addr[15:0]} :
          20'hFFFFF;
 
-    wire bios_load_n = ~(ioctl_download & (select_pcxt | select_tandy | select_xtide));
+    wire bios_load_n = ~(ioctl_download & (select_pcxt | select_tandy | select_xtide | select_ega_bios));
 
     always @(posedge clk_chipset, posedge reset_sdram)
     begin
         if (reset_sdram)
         begin
-            bios_protect_flag   <= 2'b11;
+            bios_protect_flag   <= 3'b011;
             bios_access_request <= 1'b0;
             bios_access_address <= 20'hFFFFF;
             bios_write_data     <= 16'hFFFF;
@@ -679,18 +683,21 @@ module emu
             bios_write_wait_cnt <= 'h0;
             bios_write_byte_cnt <= 1'h0;
             tandy_bios_write    <= 1'b0;
+            ega_bios_loaded     <= 1'b0;
             ioctl_wait          <= 1'b1;
             bios_load_state     <= 4'h00;
         end
         else if (~initilized_sdram)
         begin
-            bios_protect_flag   <= 2'b11;
+            bios_protect_flag   <= 3'b011;
             bios_access_request <= 1'b0;
             bios_access_address <= 20'hFFFFF;
             bios_write_data     <= 16'hFFFF;
             bios_write_n        <= 1'b1;
             bios_write_wait_cnt <= 'h0;
             bios_write_byte_cnt <= 1'h0;
+            tandy_bios_write    <= 1'b0;
+            ega_bios_loaded     <= 1'b0;
             ioctl_wait          <= 1'b1;
             bios_load_state     <= 4'h00;
         end
@@ -699,7 +706,7 @@ module emu
             casez (bios_load_state)
                 4'h00:
                 begin
-                    bios_protect_flag   <= ~status[31:30];  // bios_writable
+                    bios_protect_flag   <= {ega_bios_loaded, ~status[31:30]};  // ega/f000/ec00 protection
                     bios_access_address <= 20'hFFFFF;
                     bios_write_data     <= 16'hFFFF;
                     bios_write_n        <= 1'b1;
@@ -724,7 +731,7 @@ module emu
                 end
                 4'h01:
                 begin
-                    bios_protect_flag   <= 2'b00;
+                    bios_protect_flag   <= 3'b000;
                     bios_access_request <= 1'b1;
                     bios_write_byte_cnt <= 1'h0;
                     tandy_bios_write    <= select_tandy;
@@ -758,7 +765,7 @@ module emu
                 end
                 4'h02:
                 begin
-                    bios_protect_flag   <= 2'b00;
+                    bios_protect_flag   <= 3'b000;
                     bios_access_request <= 1'b1;
                     bios_access_address <= bios_access_address;
                     bios_write_data     <= bios_write_data;
@@ -780,7 +787,7 @@ module emu
                 end
                 4'h03:
                 begin
-                    bios_protect_flag   <= 2'b00;
+                    bios_protect_flag   <= 3'b000;
                     bios_access_request <= 1'b1;
                     bios_access_address <= bios_access_address;
                     bios_write_data     <= bios_write_data;
@@ -797,7 +804,7 @@ module emu
                 end
                 4'h04:
                 begin
-                    bios_protect_flag   <= 2'b00;
+                    bios_protect_flag   <= 3'b000;
                     bios_access_request <= 1'b1;
                     bios_access_address <= bios_access_address + 'h1;
                     bios_write_data     <= {8'hFF, bios_write_data[15:8]};
@@ -805,6 +812,7 @@ module emu
                     bios_write_wait_cnt <= 'h0;
                     bios_write_byte_cnt <= ~bios_write_byte_cnt;
                     tandy_bios_write    <= 1'b0;
+                    ega_bios_loaded     <= (bios_write_byte_cnt == 1'b1 && select_ega_bios) ? 1'b1 : ega_bios_loaded;
                     ioctl_wait          <= 1'b1;
                     if (bios_write_byte_cnt == 1'b0)
                         bios_load_state     <= 4'h02;
@@ -813,7 +821,7 @@ module emu
                 end
                 default:
                 begin
-                    bios_protect_flag   <= 2'b11;
+                    bios_protect_flag   <= {ega_bios_loaded, 2'b11};
                     bios_access_request <= 1'b0;
                     bios_access_address <= 20'hFFFFF;
                     bios_write_data     <= 16'hFFFF;
@@ -1628,6 +1636,7 @@ module emu
 
     wire       pre2x_LHBL, pre2x_LVBL;
     wire [7:0] pre2x_r, pre2x_g, pre2x_b;
+    wire [23:0] credits_rgb_out;
 	 
 
 	video_mixer #(.GAMMA(1)) video_mixer_cga
@@ -1902,8 +1911,11 @@ module emu
         // output image
         .HB_out     ( pre2x_LHBL      ),
         .VB_out     ( pre2x_LVBL      ),
-        .rgb_out    ( {VGA_R, VGA_G, VGA_B } )
+        .rgb_out    ( credits_rgb_out )
     );
+
+    assign {VGA_R, VGA_G, VGA_B} = credits_rgb_out;
 
 
 endmodule
+

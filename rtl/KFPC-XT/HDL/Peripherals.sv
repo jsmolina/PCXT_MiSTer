@@ -79,6 +79,9 @@ module PERIPHERALS #(
         input   logic           memory_read_n,
         input   logic           memory_write_n,
         input   logic           address_enable_n,
+        output  logic           hgc_memory_access_ready,
+        output  logic           cga_memory_access_ready,
+        output  logic           ega_memory_access_ready,
         // Peripherals
         output  logic   [2:0]   timer_counter_out,
         output  logic           speaker_out,
@@ -985,6 +988,8 @@ end
         hgc_mem_select_1        <= hgc_mem_select;
         cga_mem_select_1        <= cga_mem_select;
         video_mem_select_1      <= video_mem_select;
+        ega_mem_select_sys      <= ega_mem_select;
+        ega_mem_write_sys       <= ega_mem_select & ~memory_write_n;
 
         video_io_write_n        <= io_write_n;
         video_io_read_n         <= io_read_n;
@@ -1080,7 +1085,7 @@ end
         end
     end
 
-    always_ff @(posedge clk_vga_cga)
+    always_ff @(posedge clk_vga_cga, posedge reset)
     begin
         if (`ENABLE_CGA)
         begin
@@ -1189,6 +1194,7 @@ end
         .ram_we_l                   (HGC_VRAM_ENABLE),
         .ram_a                      (HGC_VRAM_ADDR),
         .ram_d                      (HGC_VRAM_DOUT),
+        .ram_data_valid             (hgc_vram_video_valid),
         .hsync                      (HSYNC_HGC),
         .hblank                     (HBLANK_HGC),
         .vsync                      (VSYNC_HGC),
@@ -1272,9 +1278,10 @@ end
         .blue(B_CGA)
     );
 
-    cga cga1 
+    ega_top ega1 
     (
         .clk                        (clk_vga_cga),
+        .reset                      (reset),
         .clkdiv                     (clkdiv),
         .bus_a                      (cga_io_address_2),
         .bus_ior_l                  (cga_io_read_n_2),
@@ -1331,10 +1338,9 @@ end
     end
 
 
-    defparam cga1.BLINK_MAX = 24'd4772727;
+    defparam ega1.BLINK_MAX = 24'd4772727;
     defparam hgc1.BLINK_MAX = 24'd9100000;
-    wire [7:0] cga_vram_cpu_dout;
-    wire [7:0] hgc_vram_cpu_dout;
+    localparam int CGA_VRAM_AW = (`ENABLE_TANDY_VIDEO ? 17 : 14);
 
     splash_rom splash_rom_inst
     (
@@ -1391,7 +1397,55 @@ end
         .doutb                      (HGC_VRAM_DOUT)
     );
 
+    ega_vram_bram_frontend ega_vram_frontend
+    (
+        .clock                      (clock),
+        .reset                      (reset),
+        .clk_video                  (clk_vga_cga),
+        .cpu_addr                   (ega_vram_cpu_addr),
+        .cpu_a16                    (ega_vram_cpu_a16),
+        .cpu_din                    (ega_vram_cpu_din),
+        .cpu_read                   (ega_vram_cpu_read_req),
+        .cpu_write                  (ega_vram_cpu_write_req),
+        .cpu_dout                   (ega_vram_cpu_dout),
+        .cpu_ready                  (ega_vram_cpu_ready),
+        .video_addr                 (EGA_FETCH_ADDR),
+        .video_read_en              (EGA_FETCH_EN),
+        .video_plane0               (EGA_PLANE0_DOUT),
+        .video_plane1               (EGA_PLANE1_DOUT),
+        .video_plane2               (EGA_PLANE2_DOUT),
+        .video_plane3               (EGA_PLANE3_DOUT),
+        .video_data_valid           (EGA_FETCH_DATA_VALID),
+        .cfg_toggle                 (ega_cfg_toggle),
+        .plane_write_mask           (ega_plane_write_mask_cfg),
+        .odd_even_mode              (ega_odd_even_mode_cfg),
+        .cpu_access_en              (ega_cpu_access_slot_cfg),
+        .chain2_write               (ega_chain2_write_cfg),
+        .chain2_read                (ega_chain2_read_cfg),
+        .extended_memory            (ega_extended_memory_cfg),
+        .mem_map_sel                (ega_mem_map_sel_cfg),
+        .page_select                (ega_page_select_cfg),
+        .write_mode                 (ega_write_mode_cfg),
+        .read_mode                  (ega_read_mode_cfg),
+        .read_plane_sel             (ega_read_plane_sel_cfg),
+        .color_compare              (ega_color_compare_cfg),
+        .color_dont_care            (ega_color_dont_care_cfg),
+        .bit_mask                   (ega_bit_mask_cfg),
+        .set_reset                  (ega_set_reset_cfg),
+        .enable_set_reset           (ega_enable_set_reset_cfg),
+        .rop_select                 (ega_rop_select_cfg),
+        .rotate_count               (ega_rotate_count_cfg)
+    );
 
+    assign hgc_memory_access_ready = `ENABLE_HGC
+                                   ? ((hgc_mem_select && (~memory_read_n || ~memory_write_n)) ? hgc_vram_cpu_ready : 1'b1)
+                                   : 1'b1;
+    assign cga_memory_access_ready = `ENABLE_CGA
+                                   ? (cga_vram_cpu_cycle ? cga_vram_cpu_ready : 1'b1)
+                                   : 1'b1;
+    assign ega_memory_access_ready = `ENABLE_EGA
+                                   ? (ega_vram_cpu_cycle ? ega_vram_cpu_ready : 1'b1)
+                                   : 1'b1;
     //
     // XT2IDE
     //
