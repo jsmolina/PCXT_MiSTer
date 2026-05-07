@@ -16,6 +16,49 @@
 //
 //============================================================================
 
+`ifndef SYSTEM_VARIANT_TANDY
+`define SYSTEM_VARIANT_TANDY 0
+`endif
+`ifndef ROM_VARIANT_TANDY
+`define ROM_VARIANT_TANDY `SYSTEM_VARIANT_TANDY
+`endif
+`ifndef ROM_IS_TANDY
+`define ROM_IS_TANDY `ROM_VARIANT_TANDY
+`endif
+`ifndef CONF_STR_SYSTEM
+`define CONF_STR_SYSTEM (`SYSTEM_VARIANT_TANDY ? "Tandy1000;UART115200:115200;" : "PCXT;UART115200:115200;")
+`endif
+`ifndef ENABLE_TANDY_VIDEO
+`define ENABLE_TANDY_VIDEO 0
+`endif
+`ifndef ENABLE_TANDY_AUDIO
+`define ENABLE_TANDY_AUDIO 0
+`endif
+`ifndef ENABLE_TANDY_KBD
+`define ENABLE_TANDY_KBD 0
+`endif
+`ifndef ENABLE_A000_UMB
+`define ENABLE_A000_UMB 0
+`endif
+`ifndef ENABLE_CGA
+`define ENABLE_CGA 1
+`endif
+`ifndef ENABLE_HGC
+`define ENABLE_HGC 0
+`endif
+`ifndef ENABLE_EGA
+`define ENABLE_EGA 1
+`endif
+`ifndef ENABLE_OPL2
+`define ENABLE_OPL2 0
+`endif
+`ifndef ENABLE_CMS
+`define ENABLE_CMS 0
+`endif
+`ifndef ENABLE_EMS
+`define ENABLE_EMS 0
+`endif
+
 module emu
     (
         //Master input clock
@@ -55,6 +98,7 @@ module emu
         input  [11:0] HDMI_HEIGHT,
         output        HDMI_FREEZE,
         output        HDMI_BLACKOUT,
+	output        HDMI_BOB_DEINT,
 
 		`ifdef MISTER_FB
         // Use framebuffer in DDRAM (USE_FB=1 in qsf)
@@ -187,6 +231,7 @@ module emu
     assign VGA_DISABLE = 0;
     assign HDMI_FREEZE = 0;
     assign HDMI_BLACKOUT = 0;
+    assign HDMI_BOB_DEINT = 0;
 
     assign LED_DISK = 0;
     assign LED_POWER = 0;
@@ -206,8 +251,18 @@ module emu
 
 	`include "build_id.v"
 
+    localparam CONF_STR_HGC = ((`ENABLE_HGC && `ENABLE_CGA) ? "P1oC,PCXT CGA Graphics,Yes,No;P1oD,PCXT Hercules Graphics,Yes,No;" : "");
+    localparam CONF_STR_EGA = (`ENABLE_EGA ? "P1oL,EGA Gate,Disabled,Enabled;" : "");
+    localparam CONF_STR_VIDEO_PRIMARY = ((`ENABLE_HGC && `ENABLE_CGA) ? "P1O4,PCXT 1st Video,CGA,Hercules;" : "");
+    localparam CONF_STR_ROM = (`ROM_IS_TANDY ? "P1FC1,ROM,Tandy BIOS:;P1-;" : "P1FC0,ROM,PCXT BIOS:;");
+    localparam CONF_STR_CMS = (`ENABLE_CMS ? "P2OA,C/MS Audio,Enabled,Disabled;" : "");
+    localparam CONF_STR_OPL2 = (`ENABLE_OPL2 ? "P2oAB,OPL2,Adlib 388h,SB FM 388h/228h, Disabled;" : "");
+    localparam CONF_STR_TANDY_AUDIO = (`ENABLE_TANDY_AUDIO ? "P2o23,Tandy Volume,1,2,3,4;" : "");
+    localparam CONF_STR_EMS = (`ENABLE_EMS ? "P3OB,Lo-tech 2MB EMS,Enabled,Disabled;P3OCD,EMS Frame,C000,D000,E000;P3-;" : "");
+    localparam CONF_STR_A000 = (`ENABLE_A000_UMB ? "P3o9,A000 UMB,Enabled,Disabled;P3-;" : "");
+
     localparam CONF_STR = {
-		"PCXT;UART115200:115200;",
+		`CONF_STR_SYSTEM,
 		"S0,IMGIMAVFD,Floppy A:;",
 		"S1,IMGIMAVFD,Floppy B:;",
 		"OJK,Write Protect,None,A:,B:,A: & B:;",
@@ -220,32 +275,31 @@ module emu
 		"-;",
 		"P1,System & BIOS;",
 		"P1-;",
-		"P1O3,Model,IBM PCXT,Tandy 1000;",
-		"P1-;",
-		"P1oC,PCXT CGA Graphics,Yes,No;",
-		"P1oD,PCXT Hercules Graphics,Yes,No;",
-		"P1O4,PCXT 1st Video,CGA,Hercules;",
-		"P1-;",
+		CONF_STR_HGC,
+		CONF_STR_EGA,
+		CONF_STR_VIDEO_PRIMARY,
 		"P1O7,Boot Splash Screen,Yes,No;",
 		"P1-;",
-		"P1FC0,ROM,PCXT BIOS:;",
-		"P1FC1,ROM,Tandy BIOS:;",
-		"P1-;",
+		CONF_STR_ROM,
 		"P1FC2,ROM,EC00 BIOS:;",
+		"P1FC3,ROM,EGA BIOS:;",
 		"P1-;",
-		"P1OUV,BIOS Writable,None,EC00,PCXT/Tandy,All;",
+		"P1OUV,BIOS Writable,None,EC00,Main,All;",
 		"P1-;",	
 		"P2,Audio & Video;",
 		"P2-;",
-		"P2OA,C/MS Audio,Enabled,Disabled;",
-		"P2oAB,OPL2,Adlib 388h,SB FM 388h/228h, Disabled;",
+		CONF_STR_CMS,
+		CONF_STR_OPL2,
 		"P2o01,Speaker Volume,1,2,3,4;",
-		"P2o23,Tandy Volume,1,2,3,4;",
+		CONF_STR_TANDY_AUDIO,
 		"P2o45,Audio Boost,No,2x,4x;",
 		"P2o67,Stereo Mix,none,25%,50%,100%;",
 		"P2-;",
 		"P2oEH,CRT H offset,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15;",
-		"P2oIK,CRT V offset,0,1,2,3,4,5,6,7;",
+		"P2oIK,CRT V offset,0,1,2,3,4,5,6,7;",        
+		"P2oMO,VSync Width,Auto,1,2,3,4,5,6,7;",
+		"P2oPR,HSync Width,Auto,1,2,3,4,5,6,7;",
+        "P2-;",
 		"P2O12,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 		"P2O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 		"P2OT,Border,No,Yes;",
@@ -254,11 +308,8 @@ module emu
 		"P2-;",
 		"P3,Hardware;",
 		"P3-;",
-		"P3OB,Lo-tech 2MB EMS,Enabled,Disabled;",
-		"P3OCD,EMS Frame,C000,D000,E000;",
-		"P3-;",
-		"P3o9,A000 UMB,Enabled,Disabled;",
-		"P3-;",
+		CONF_STR_EMS,
+		CONF_STR_A000,
 		"P3ONO,Joystick 1, Analog, Digital, Disabled;",
 		"P3OPQ,Joystick 2, Analog, Digital, Disabled;",
 		"P3OR,Sync Joy to CPU Speed,No,Yes;",
@@ -305,33 +356,40 @@ module emu
     wire [2:0] screen_mode = status[16:14];
     wire [1:0] ar = status[9:8];
     wire border = status[29] | xtctl[1];
-	wire a000h = ~status[41] & ~xtctl[6];
+    wire a000h = `ENABLE_A000_UMB ? (~status[41] & ~xtctl[6]) : 1'b0;
+    wire ega_enabled = `ENABLE_EGA ? status[53] : 1'b0;
+    wire [2:0] vsync_width_osd = status[56:54];  // 0=Auto (use register), 1-7=override
+    wire [2:0] hsync_width_osd = status[59:57];  // 0=Auto, 1-7=fixed width (Nx16 pixel clocks)
 
     reg [1:0]   scale_video_ff;
     reg         hgc_mode_video_ff;
     reg [2:0]   screen_mode_video_ff;
     reg         border_video_ff;
     reg         cga_hw;
+    wire        video_scandoubler_en = (scale_video_ff > 0) || forced_scandoubler;
+    wire        cga_scandouble_en = video_scandoubler_en;
     reg         hercules_hw;
+    wire [15:0] status_menumask = {12'd0, ega_enabled, ega_enabled, status[5]};
 
     wire VGA_VBlank_border;
     wire std_hsyncwidth;
     wire pause_core;
     wire swap_video;
+    wire swap_video_eff = `ENABLE_HGC ? (`ENABLE_CGA ? swap_video : (`ENABLE_TANDY_VIDEO ? 1'b0 : 1'b1)) : 1'b0;
 
-    always @(posedge CLK_VIDEO)
+    always @(posedge clk_57_272)
     begin
         scale_video_ff          <= scale;
         screen_mode_video_ff    <= screen_mode;
         border_video_ff         <= border;
-        cga_hw                  <= ~status[44] | tandy_mode;
-        hercules_hw             <= ~status[45] & ~tandy_mode;
+        cga_hw                  <= `ENABLE_CGA ? (~status[44] | tandy_video_mode) : 1'b0;
+        hercules_hw             <= `ENABLE_HGC ? (`ENABLE_CGA ? ~status[45] : 1'b1) : 1'b0;
         VIDEO_ARX               <= (!ar) ? 12'd4 : (ar - 1'd1);
         VIDEO_ARY               <= (!ar) ? 12'd3 : 12'd0;
     end
 
     always @(posedge clk_chipset)
-        hgc_mode_video_ff       <= hgc_mode & ~tandy_mode;
+        hgc_mode_video_ff       <= `ENABLE_HGC ? hgc_mode : 1'b0;
 
     hps_io #(.CONF_STR(CONF_STR), .PS2DIV(2000), .PS2WE(1), .WIDE(1)) hps_io 
 	(
@@ -344,7 +402,7 @@ module emu
 
 		.buttons(buttons),
 		.status(status),
-		.status_menumask({status[5]}),
+		.status_menumask(status_menumask),
 
 		.ps2_kbd_clk_in		(ps2_kbd_clk_out),
 		.ps2_kbd_data_in	(ps2_kbd_data_out),
@@ -404,18 +462,15 @@ module emu
 
     wire clk_100;
     wire clk_28_636;
-    wire clk_56_875;
-    wire clk_113_750;
-    reg clk_25 = 1'b0;
+    wire clk_57_272;
+    wire clk_114_544;
+    wire clk_video_out_ps;
     reg clk_14_318 = 1'b0;
-    reg clk_9_54 = 1'b0;
-    reg clk_7_16 = 1'b0;
-    wire clk_4_77;
     wire clk_cpu;
-    wire pclk;
+    logic cpu_ce_posedge;
+    logic cpu_ce_negedge;
+    logic peripheral_ce;
     wire clk_chipset;
-    wire peripheral_clock;
-    wire clk_uart;
 
     localparam [27:0] cur_rate = 28'd50000000;
 
@@ -424,16 +479,25 @@ module emu
 		.refclk(CLK_50M),
 		.rst(0),
 		.outclk_0(clk_100),
-		.outclk_1(clk_56_875),
-		.outclk_2(clk_28_636),
-		.outclk_3(clk_uart),
-		//.outclk_4(clk_opl2),
-		.outclk_5(clk_chipset),
-		.outclk_6(clk_113_750),
+        .outclk_1(clk_chipset),
 		.locked(pll_locked)
 	);
 
-    wire reset_wire = RESET | status[0] | buttons[1] | !pll_locked | splashscreen;
+    wire pll_system_locked;
+
+    pll_system pll_system_inst (
+        .refclk(CLK_50M),
+        .rst(0),
+        .outclk_0(clk_28_636),
+        .outclk_1(clk_57_272),
+        .outclk_2(clk_114_544),
+        .outclk_3(clk_video_out_ps),
+        .locked(pll_system_locked)
+    );
+
+    wire cga_clear_busy;
+    wire reset_wire = RESET | status[0] | buttons[1] | !pll_locked | !pll_system_locked  | splashscreen | splash_reset_hold | splash_pending;
+    wire video_retime_reset = RESET | status[0] | buttons[1] | !pll_locked | !pll_system_locked | splash_pending;
     wire reset_sdram_wire = RESET | !pll_locked;
 
     //////////////////////////////////////////////////////////////////
@@ -448,35 +512,6 @@ module emu
         ce_pixel_cga <= clk_14_318;	//if outside always block appears an overscan column in CGA mode
     end
 
-    reg [4:0] clk_9_54_cnt = 1'b0;
-    always @(posedge clk_chipset)
-        if (4'd0 == clk_9_54_cnt) begin
-            if (clk_9_54)
-                clk_9_54_cnt  <= 4'd3 - 4'd1;
-            else
-                clk_9_54_cnt  <= 4'd2 - 4'd1;
-            clk_9_54      <= ~clk_9_54;
-        end
-        else begin
-            clk_9_54_cnt  <= clk_9_54_cnt - 4'd1;
-            clk_9_54      <= clk_9_54;
-        end
-
-    always @(posedge clk_chipset)
-        clk_25 <= ~clk_25;
-
-    always @(posedge clk_14_318)
-        clk_7_16 <= ~clk_7_16;      // 7.16Mhz
-
-    clk_div3 clk_normal             // 4.77MHz
-    (
-        .clk(clk_14_318),
-        .clk_out(clk_4_77)
-    );
-
-    always @(posedge clk_4_77)
-        peripheral_clock <= ~peripheral_clock; // 2.385Mhz
-
     //////////////////////////////////////////////////////////////////
 
     logic  biu_done;
@@ -487,93 +522,34 @@ module emu
     logic  [1:0] ram_write_wait_cycle;
     logic        cycle_accrate;
     logic  [1:0] clk_select;
-
+    wire   [1:0] clk_select_next = ((xtctl[3:2] == 2'b00) && ~xtctl[7]) ? status[18:17] :
+                                   (xtctl[7] ? 2'b11 : xtctl[3:2] - 2'b01);
 
     always @(posedge clk_chipset, posedge reset)
     begin
         if (reset)
-            clk_select  <= 2'b00;
-
+            clk_select <= 2'b00;
         else if (biu_done)
-            clk_select  <= (xtctl[3:2] == 2'b00 & ~xtctl[7]) ? status[18:17] : xtctl[7] ? 2'b11 : xtctl[3:2] - 2'b01;
-
-        else
-            clk_select  <= clk_select;
-
+            clk_select <= clk_select_next;
     end
 
-    logic  clk_cpu_ff_1;
-    logic  clk_cpu_ff_2;
-
-    logic  pclk_ff_1;
-    logic  pclk_ff_2;
-
-    always @(posedge clk_chipset, posedge reset)
-    begin
-        if (reset)
-        begin
-            clk_cpu_ff_1    <= 1'b0;
-            clk_cpu_ff_2    <= 1'b0;
-            clk_cpu         <= 1'b0;
-            pclk_ff_1       <= 1'b0;
-            pclk_ff_2       <= 1'b0;
-            pclk            <= 1'b0;
-            cycle_accrate   <= 1'b1;
-            clock_cycle_counter_division_ratio  <= 8'd1 - 8'd1;
-            clock_cycle_counter_decrement_value <= 8'd1;
-            shift_read_timing                   <= 1'b0;
-            ram_read_wait_cycle                 <= 2'd0;
-            ram_write_wait_cycle                <= 2'd0;
-        end
-        else
-        begin
-            clk_cpu_ff_2    <= clk_cpu_ff_1;
-            clk_cpu         <= clk_cpu_ff_2;
-            pclk_ff_1       <= peripheral_clock;
-            pclk_ff_2       <= pclk_ff_1;
-            pclk            <= pclk_ff_2;
-            casez (clk_select)
-                2'b00: begin
-                    clk_cpu_ff_1    <= clk_4_77;
-                    clock_cycle_counter_division_ratio  <= 8'd1 - 8'd1;
-                    clock_cycle_counter_decrement_value <= 8'd1;
-                    shift_read_timing                   <= 1'b0;
-                    ram_read_wait_cycle                 <= 2'd0;
-                    ram_write_wait_cycle                <= 2'd0;
-                    cycle_accrate                       <= 1'b1;
-                end
-                2'b01: begin
-                    clk_cpu_ff_1    <= clk_7_16;
-                    clock_cycle_counter_division_ratio  <= 8'd2 - 8'd1;
-                    clock_cycle_counter_decrement_value <= 8'd3;
-                    shift_read_timing                   <= 1'b0;
-                    ram_read_wait_cycle                 <= 2'd0;
-                    ram_write_wait_cycle                <= 2'd0;
-                    cycle_accrate                       <= 1'b1;
-                end
-                2'b10: begin
-                    clk_cpu_ff_1    <= clk_9_54;
-                    clock_cycle_counter_division_ratio  <= 8'd10 - 8'd1;
-                    clock_cycle_counter_decrement_value <= 8'd21;
-                    shift_read_timing                   <= 1'b0;
-                    ram_read_wait_cycle                 <= 2'd0;
-                    ram_write_wait_cycle                <= 2'd0;
-                    cycle_accrate                       <= 1'b1;
-
-                end
-                2'b11: begin
-                    clk_cpu_ff_1    <= clk_25;
-                    clock_cycle_counter_division_ratio  <= 8'd1 - 8'd1;
-                    clock_cycle_counter_decrement_value <= 8'd5;
-                    shift_read_timing                   <= 1'b1;
-                    ram_read_wait_cycle                 <= 2'd1;
-                    ram_write_wait_cycle                <= 2'd0;
-                    cycle_accrate                       <= 1'b0;
-                end
-            endcase
-        end
-    end
-
+    XT_CE_Generator u_XT_CE_Generator
+    (
+        .clock                              (clk_chipset),
+        .reset                              (reset),
+        .clk_select_load                    (biu_done),
+        .clk_select                         (clk_select_next),
+        .cpu_clk_pin                        (clk_cpu),
+        .cpu_ce_posedge                     (cpu_ce_posedge),
+        .cpu_ce_negedge                     (cpu_ce_negedge),
+        .peripheral_ce                      (peripheral_ce),
+        .cycle_accrate                      (cycle_accrate),
+        .clock_cycle_counter_division_ratio (clock_cycle_counter_division_ratio),
+        .clock_cycle_counter_decrement_value(clock_cycle_counter_decrement_value),
+        .shift_read_timing                  (shift_read_timing),
+        .ram_read_wait_cycle                (ram_read_wait_cycle),
+        .ram_write_wait_cycle               (ram_write_wait_cycle)
+    );
     //////////////////////////////////////////////////////////////////
 
     logic reset = 1'b1;
@@ -620,15 +596,14 @@ module emu
             reset_cpu_ff <= reset;
     end
 
-    reg tandy_mode = 0;
+    localparam tandy_video_mode = `ENABLE_TANDY_VIDEO;
     reg hgc_mode = 0;
 
     always @(negedge clk_chipset, posedge reset)
     begin
         if (reset)
         begin
-            tandy_mode <= status[3];
-            hgc_mode <= status[4];
+            hgc_mode <= `ENABLE_HGC ? (`ENABLE_CGA ? status[4] : 1'b1) : 1'b0;
             reset_cpu <= 1'b1;
             reset_cpu_count <= 16'h0000;
         end
@@ -684,7 +659,7 @@ module emu
     //
 
     reg [4:0]  bios_load_state = 4'h0;
-    reg [1:0]  bios_protect_flag;
+    reg [2:0]  bios_protect_flag;
     reg        bios_access_request;
     reg [19:0] bios_access_address;
     reg [15:0] bios_write_data;
@@ -692,23 +667,25 @@ module emu
     reg [7:0]  bios_write_wait_cnt;
     reg        bios_write_byte_cnt;
     reg        tandy_bios_write;
-
+    reg        ega_bios_loaded;
     wire select_pcxt  = (ioctl_index[5:0] == 0) && (ioctl_addr[24:16] == 9'b000000000);
-    wire select_tandy = (ioctl_index[5:0] == 1) && (ioctl_addr[24:16] == 9'b000000000);
+    wire select_tandy = `ROM_IS_TANDY ? (ioctl_index[5:0] == 1) && (ioctl_addr[24:16] == 9'b000000000) : 1'b0;
     wire select_xtide = ioctl_index == 2;
+    wire select_ega_bios = (ioctl_index[5:0] == 3) && (ioctl_addr[24:16] == 9'b000000000);
 
     wire [19:0] bios_access_address_wire = select_pcxt  ? { 4'b1111, ioctl_addr[15:0]} :
          select_tandy ? { 4'b1111, ioctl_addr[15:0]} :
          select_xtide ? { 6'b111011, ioctl_addr[13:0]} :
+         select_ega_bios ? { 4'b1100, ioctl_addr[15:0]} :
          20'hFFFFF;
 
-    wire bios_load_n = ~(ioctl_download & (select_pcxt | select_tandy | select_xtide));
+    wire bios_load_n = ~(ioctl_download & (select_pcxt | select_tandy | select_xtide | select_ega_bios));
 
     always @(posedge clk_chipset, posedge reset_sdram)
     begin
         if (reset_sdram)
         begin
-            bios_protect_flag   <= 2'b11;
+            bios_protect_flag   <= 3'b011;
             bios_access_request <= 1'b0;
             bios_access_address <= 20'hFFFFF;
             bios_write_data     <= 16'hFFFF;
@@ -716,18 +693,21 @@ module emu
             bios_write_wait_cnt <= 'h0;
             bios_write_byte_cnt <= 1'h0;
             tandy_bios_write    <= 1'b0;
+            ega_bios_loaded     <= 1'b0;
             ioctl_wait          <= 1'b1;
             bios_load_state     <= 4'h00;
         end
         else if (~initilized_sdram)
         begin
-            bios_protect_flag   <= 2'b11;
+            bios_protect_flag   <= 3'b011;
             bios_access_request <= 1'b0;
             bios_access_address <= 20'hFFFFF;
             bios_write_data     <= 16'hFFFF;
             bios_write_n        <= 1'b1;
             bios_write_wait_cnt <= 'h0;
             bios_write_byte_cnt <= 1'h0;
+            tandy_bios_write    <= 1'b0;
+            ega_bios_loaded     <= 1'b0;
             ioctl_wait          <= 1'b1;
             bios_load_state     <= 4'h00;
         end
@@ -736,14 +716,14 @@ module emu
             casez (bios_load_state)
                 4'h00:
                 begin
-                    bios_protect_flag   <= ~status[31:30];  // bios_writable
+                    bios_protect_flag   <= {ega_bios_loaded, ~status[31:30]};  // ega/f000/ec00 protection
                     bios_access_address <= 20'hFFFFF;
                     bios_write_data     <= 16'hFFFF;
                     bios_write_n        <= 1'b1;
                     bios_write_wait_cnt <= 'h0;
                     bios_write_byte_cnt <= 1'h0;
                     tandy_bios_write    <= 1'b0;
-
+                    ega_bios_loaded     <= ega_bios_loaded;
                     if (~ioctl_download)
                     begin
                         bios_access_request <= 1'b0;
@@ -762,11 +742,11 @@ module emu
                 end
                 4'h01:
                 begin
-                    bios_protect_flag   <= 2'b00;
+                    bios_protect_flag   <= 3'b000;
                     bios_access_request <= 1'b1;
                     bios_write_byte_cnt <= 1'h0;
                     tandy_bios_write    <= select_tandy;
-
+                    ega_bios_loaded     <= select_ega_bios ? 1'b0 : ega_bios_loaded;
                     if (~ioctl_download)
                     begin
                         bios_access_address <= 20'hFFFFF;
@@ -797,7 +777,7 @@ module emu
                 end
                 4'h02:
                 begin
-                    bios_protect_flag   <= 2'b00;
+                    bios_protect_flag   <= 3'b000;
                     bios_access_request <= 1'b1;
                     bios_access_address <= bios_access_address;
                     bios_write_data     <= bios_write_data;
@@ -819,7 +799,7 @@ module emu
                 end
                 4'h03:
                 begin
-                    bios_protect_flag   <= 2'b00;
+                    bios_protect_flag   <= 3'b000;
                     bios_access_request <= 1'b1;
                     bios_access_address <= bios_access_address;
                     bios_write_data     <= bios_write_data;
@@ -836,7 +816,7 @@ module emu
                 end
                 4'h04:
                 begin
-                    bios_protect_flag   <= 2'b00;
+                    bios_protect_flag   <= 3'b000;
                     bios_access_request <= 1'b1;
                     bios_access_address <= bios_access_address + 'h1;
                     bios_write_data     <= {8'hFF, bios_write_data[15:8]};
@@ -844,6 +824,7 @@ module emu
                     bios_write_wait_cnt <= 'h0;
                     bios_write_byte_cnt <= ~bios_write_byte_cnt;
                     tandy_bios_write    <= 1'b0;
+                    ega_bios_loaded     <= (bios_write_byte_cnt == 1'b1 && select_ega_bios) ? 1'b1 : ega_bios_loaded;
                     ioctl_wait          <= 1'b1;
                     if (bios_write_byte_cnt == 1'b0)
                         bios_load_state     <= 4'h02;
@@ -852,7 +833,7 @@ module emu
                 end
                 default:
                 begin
-                    bios_protect_flag   <= 2'b11;
+                    bios_protect_flag   <= {ega_bios_loaded, 2'b11};
                     bios_access_request <= 1'b0;
                     bios_access_address <= 20'hFFFFF;
                     bios_write_data     <= 16'hFFFF;
@@ -873,21 +854,77 @@ module emu
     //
     // Splash screen
     //
-    reg splash_off;
+    reg splash_off = 1'b1;
     reg [24:0] splash_cnt = 0;
     reg [3:0] splash_cnt2 = 0;
-    reg splashscreen = 1;
+    reg splashscreen = 1'b0;
+    reg splash_pending = 1'b1;
+    reg [23:0] splash_boot_cnt = 24'd0;
+    reg splashscreen_sync1 = 0;
+    reg splashscreen_sync2 = 0;
+    reg splashscreen_sync_prev = 0;
+    reg status0_sync1 = 0;
+    reg status0_sync2 = 0;
+    reg status0_sync_prev = 0;
+    typedef enum logic [1:0] {
+        SPLASH_HOLD_IDLE,
+        SPLASH_HOLD_WAIT_BUSY_START,
+        SPLASH_HOLD_WAIT_BUSY_END
+    } splash_hold_state_t;
+    wire status0_clear_pulse = status0_sync2 & ~status0_sync_prev;
+    wire splash_clear_hold_start = status0_clear_pulse | (splashscreen_sync_prev & ~splashscreen_sync2);
+    reg splash_reset_hold = 0;
+    splash_hold_state_t splash_hold_state = SPLASH_HOLD_IDLE;
+    reg phys_reset_hold = 0;
+    reg [23:0] phys_reset_cnt = 24'd0;
+    localparam [23:0] PHYS_RESET_HOLD = 24'd2863600;
+    localparam [23:0] SPLASH_BOOT_WAIT = 24'd14318000;
 
     always @ (posedge clk_14_318)
     begin
         splash_off <= status[7];
+        if (RESET || buttons[1])
+        begin
+            phys_reset_hold <= 1'b1;
+            phys_reset_cnt <= 24'd0;
+        end
+        else if (phys_reset_hold)
+        begin
+            if (phys_reset_cnt == PHYS_RESET_HOLD)
+                phys_reset_hold <= 1'b0;
+            else
+                phys_reset_cnt <= phys_reset_cnt + 24'd1;
+        end
 
-        if (splashscreen)
+        if (splash_pending)
+        begin
+            if (~splash_off)
+            begin
+                splashscreen <= 1'b1;
+                splash_cnt <= 0;
+                splash_cnt2 <= 0;
+                splash_pending <= 1'b0;
+                splash_boot_cnt <= 24'd0;
+            end
+            else if (splash_boot_cnt == SPLASH_BOOT_WAIT)
+            begin
+                splash_pending <= 1'b0;
+            end
+            else
+            begin
+                splash_boot_cnt <= splash_boot_cnt + 24'd1;
+            end
+        end
+        else if (splashscreen)
         begin
             if (splash_off)
+            begin
                 splashscreen <= 0;
+            end
             else if(splash_cnt2 == 5) // 5 seconds delay
+            begin
                 splashscreen <= 0;
+            end
             else if (splash_cnt == 14318000)
             begin // 1 second at 14.318Mhz
                 splash_cnt2 <= splash_cnt2 + 1;
@@ -897,6 +934,53 @@ module emu
                 splash_cnt <= splash_cnt + 1;
         end
 
+    end
+
+    always @(posedge clk_chipset)
+    begin
+        splashscreen_sync1 <= splashscreen;
+        splashscreen_sync2 <= splashscreen_sync1;
+        splashscreen_sync_prev <= splashscreen_sync2;
+        status0_sync1 <= status[0];
+        status0_sync2 <= status0_sync1;
+        status0_sync_prev <= status0_sync2;
+
+        if (RESET || !pll_locked || !pll_system_locked)
+        begin
+            splash_reset_hold <= 1'b0;
+            splash_hold_state <= SPLASH_HOLD_IDLE;
+        end
+        else
+        begin
+            case (splash_hold_state)
+                SPLASH_HOLD_IDLE:
+                begin
+                    splash_reset_hold <= 1'b0;
+                    if (splash_clear_hold_start)
+                    begin
+                        splash_reset_hold <= 1'b1;
+                        splash_hold_state <= SPLASH_HOLD_WAIT_BUSY_START;
+                    end
+                end
+
+                SPLASH_HOLD_WAIT_BUSY_START:
+                begin
+                    splash_reset_hold <= 1'b1;
+                    if (cga_clear_busy)
+                        splash_hold_state <= SPLASH_HOLD_WAIT_BUSY_END;
+                end
+
+                default:
+                begin
+                    splash_reset_hold <= 1'b1;
+                    if (~cga_clear_busy)
+                    begin
+                        splash_reset_hold <= 1'b0;
+                        splash_hold_state <= SPLASH_HOLD_IDLE;
+                    end
+                end
+            endcase
+        end
     end
 
     //
@@ -958,12 +1042,25 @@ module emu
 
     logic   [7:0]   port_b_out;
     logic   [7:0]   port_c_in;
+    wire    [1:0]   fdd_present;
     reg     [7:0]   sw;
 
-    assign  sw = hgc_mode ? 8'b00111101 : 8'b00101101; // PCXT DIP Switches (HGC or CGA 80)
+    wire    [5:0]   sw_base;
+    wire    [1:0]   sw_floppy;
+
+    assign  sw_base = `ENABLE_HGC ? (hgc_mode ? 6'b111101 : 6'b101101) : 6'b101101;
+    assign  sw_floppy = fdd_present[1] ? 2'b01 : 2'b00;
+    assign  sw = {sw_floppy, sw_base}; // DIP switches (CGA and floppy count)
     assign  port_c_in[3:0] = port_b_out[3] ? sw[7:4] : sw[3:0];
 
-    wire tandy_bios_flag = bios_write_n ? tandy_mode : tandy_bios_write;
+    wire tandy_bios_flag = bios_write_n ? `ROM_IS_TANDY : tandy_bios_write;
+
+    wire video_output_sel = `ENABLE_HGC ? hgc_mode_video_ff : 1'b0;
+    wire enable_hgc_sel = `ENABLE_HGC ? 1'b1 : 1'b0;
+    wire [1:0] hgc_rgb_sel = `ENABLE_HGC ? 2'b10 : 2'b00;
+    wire hercules_hw_sel = `ENABLE_HGC ? hercules_hw : 1'b0;
+    wire ems_enabled_sel = `ENABLE_EMS ? ~status[11] : 1'b0;
+    wire [1:0] ems_address_sel = `ENABLE_EMS ? status[13:12] : 2'b00;
 
     always @(posedge clk_chipset)
     begin
@@ -976,9 +1073,10 @@ module emu
     CHIPSET #(.clk_rate(cur_rate)) u_CHIPSET
 	(
 		.clock                              (clk_chipset),
-		.cpu_clock                          (clk_cpu),
+		.cpu_ce_posedge                     (cpu_ce_posedge),
+		.cpu_ce_negedge                     (cpu_ce_negedge),
 		.clk_sys                            (clk_chipset),
-		.peripheral_clock                   (pclk),
+		.peripheral_ce                      (peripheral_ce),
 		.clk_select                         (clk_select),
 		.reset                              (reset_cpu),
 		.sdram_reset                        (reset_sdram),
@@ -990,14 +1088,16 @@ module emu
 		.processor_ready                    (processor_ready),
 		.interrupt_to_cpu                   (interrupt_to_cpu),
 		.splashscreen                       (splashscreen),
+		.status0_clear                      (status0_clear_pulse),
+		.cga_clear_busy                     (cga_clear_busy),
 		.std_hsyncwidth                     (std_hsyncwidth),
 		.composite                          (composite),
-		.video_output                       (hgc_mode_video_ff),
+		.video_output                       (video_output_sel),
 		.clk_vga_cga                        (clk_28_636),
-		.enable_cga                         (1'b1),
-		.clk_vga_hgc                        (clk_56_875),
-		.enable_hgc                         (1'b1),
-		.hgc_rgb                            (2'b10), // always B&W - monochrome monitor tint handled down below
+		.enable_cga                         (`ENABLE_CGA),
+		.clk_vga_hgc                        (clk_57_272),
+		.enable_hgc                         (enable_hgc_sel),
+		.hgc_rgb                            (hgc_rgb_sel),
 	//	.de_o                               (VGA_DE),
 		.VGA_R                              (r),
 		.VGA_G                              (g),
@@ -1057,7 +1157,7 @@ module emu
 		.cms_en                             (~status[10]),
 		.o_cms_l                            (cms_l_snd_e),
 		.o_cms_r                            (cms_r_snd_e),
-		.tandy_video                        (tandy_mode),
+		.tandy_video                        (tandy_video_mode),
 		.tandy_bios_flag                    (tandy_bios_flag),
 		.tandy_16_gfx                       (tandy_16_gfx),
 		.tandy_color_16                     (tandy_color_16),
@@ -1084,8 +1184,8 @@ module emu
 		.sdram_dq_io                        (SDRAM_DQ_IO),
 		.sdram_ldqm                         (SDRAM_DQML),
 		.sdram_udqm                         (SDRAM_DQMH),
-		.ems_enabled                        (~status[11]),
-		.ems_address                        (status[13:12]),
+		.ems_enabled                        (ems_enabled_sel),
+		.ems_address                        (ems_address_sel),
 		.bios_protect_flag                  (bios_protect_flag),
 		.use_mmc                            (use_mmc),
 		.spi_clk                            (spi_clk),
@@ -1098,19 +1198,24 @@ module emu
 		.mgmt_write                         (mgmt_wr),
 		.mgmt_read                          (mgmt_rd),
 		.floppy_wp                          (status[20:19]),
+		.fdd_present                        (fdd_present),
 		.fdd_request                        (mgmt_req[7:6]),
 		.ide0_request                       (mgmt_req[2:0]),
 		.xtctl                              (xtctl),
-		.enable_a000h                       (a000h),
-		.wait_count_clk_en                  (~clk_cpu & clk_cpu_ff_2),
+		.enable_a000h                       (a000h & ~ega_enabled),
+		.wait_count_clk_en                  (cpu_ce_negedge),
 		.ram_read_wait_cycle                (ram_read_wait_cycle),
 		.ram_write_wait_cycle               (ram_write_wait_cycle),
 		.pause_core                         (pause_core),
 		.cga_hw                             (cga_hw),
-		.hercules_hw                        (hercules_hw),
+		.ega_enabled                        (ega_enabled),
+		.cga_scandouble_en                  (cga_scandouble_en),
+		.hercules_hw                        (hercules_hw_sel),
 		.swap_video                         (swap_video),
 		.crt_h_offset                       (status[49:46]),
-		.crt_v_offset                       (status[52:50])
+		.crt_v_offset                       (status[52:50]),
+		.vsync_width_osd                    (vsync_width_osd),
+		.hsync_width_osd                    (hsync_width_osd)
 	);
 
     wire [15:0] SDRAM_DQ_IN;
@@ -1162,7 +1267,7 @@ module emu
     wire [15:0] jtopl2_snd_e;
     wire [16:0] jtopl2_snd = {jtopl2_snd_e[15], jtopl2_snd_e};
     wire [10:0] tandy_snd_e;
-    wire [16:0] tandy_snd = {{{2{tandy_snd_e[10]}}, {4{tandy_snd_e[10]}}, tandy_snd_e} << status[35:34], 2'b00};
+    wire [16:0] tandy_snd = `ENABLE_TANDY_AUDIO ? {{{2{tandy_snd_e[10]}}, {4{tandy_snd_e[10]}}, tandy_snd_e} << status[35:34], 2'b00} : 17'd0;
     wire [16:0] spk_vol =  {2'b00, {3'b000,~speaker_out} << status[33:32], 11'd0};
     wire        speaker_out;
 
@@ -1248,7 +1353,7 @@ module emu
 
     always @(posedge clk_chipset)
     begin
-        clk_uart_ff_1 <= clk_uart;
+        clk_uart_ff_1 <= clk_14_318;
         clk_uart_ff_2 <= clk_uart_ff_1;
         clk_uart_ff_3 <= clk_uart_ff_2;
         clk_uart_en   <= ~clk_uart_ff_3 & clk_uart_ff_2;
@@ -1339,8 +1444,8 @@ module emu
     wire HSync;
     wire VBlank;
     wire VSync;
-    wire ce_pixel_cga;
-    wire ce_pixel_hgc;
+    reg  ce_pixel_cga = 1'b0;
+    wire ce_pixel_hgc_raw;
     wire de_o;
     wire [5:0] r, g, b;
     reg [7:0] raux_cga, gaux_cga, baux_cga;
@@ -1348,6 +1453,7 @@ module emu
 	 wire [7:0] VGA_R_AUX, VGA_G_AUX, VGA_B_AUX;
     wire CLK_VIDEO_HGC;
     wire CLK_VIDEO_CGA;
+    wire CE_PIXEL_CREDITS;
 
     wire  [7:0] VGA_R_cga;
     wire  [7:0] VGA_G_cga;
@@ -1357,6 +1463,8 @@ module emu
     wire        VGA_DE_cga;
     wire [21:0] gamma_bus_cga;
     wire        CE_PIXEL_cga;
+    reg         ce_pixel_cga_2x = 1'b0;
+    wire        ce_pixel_cga_vid = cga_scandouble_en ? ce_pixel_cga_2x : ce_pixel_cga;
 
     wire  [7:0] VGA_R_hgc;
     wire  [7:0] VGA_G_hgc;
@@ -1366,42 +1474,113 @@ module emu
     wire        VGA_DE_hgc;
     wire [21:0] gamma_bus_hgc;
     wire        CE_PIXEL_hgc;
+    reg  [1:0]  ce_pixel_hgc_div = 2'b0;
+    reg  [5:0]  hgc_r_meta, hgc_g_meta, hgc_b_meta;
+    reg  [5:0]  hgc_r_sync, hgc_g_sync, hgc_b_sync;
+    reg         hgc_hs_meta, hgc_vs_meta;
+    reg         hgc_hs_sync, hgc_vs_sync;
+    reg         hgc_hb_meta, hgc_vb_meta;
+    reg         hgc_hb_sync, hgc_vb_sync;
 
-    assign CLK_VIDEO = clk_56_875;
-    assign CLK_VIDEO_HGC = clk_113_750;
-    assign CLK_VIDEO_CGA = clk_56_875;
-    assign ce_pixel_hgc = clk_28_636;
+    reg  [7:0]  VGA_R_cga_src = 8'd0;
+    reg  [7:0]  VGA_G_cga_src = 8'd0;
+    reg  [7:0]  VGA_B_cga_src = 8'd0;
+    reg         VGA_HS_cga_src = 1'b0;
+    reg         VGA_VS_cga_src = 1'b0;
+    reg         VGA_DE_cga_src = 1'b0;
+    reg         LHBL_cga_src = 1'b1;
+    reg         LVBL_cga_src = 1'b1;
+    reg         CE_PIXEL_cga_src = 1'b0;
+    reg  [7:0]  VGA_R_cga_ps = 8'd0;
+    reg  [7:0]  VGA_G_cga_ps = 8'd0;
+    reg  [7:0]  VGA_B_cga_ps = 8'd0;
+    reg         VGA_HS_cga_ps = 1'b0;
+    reg         VGA_VS_cga_ps = 1'b0;
+    reg         VGA_DE_cga_ps = 1'b0;
+    reg         LHBL_cga_ps = 1'b1;
+    reg         LVBL_cga_ps = 1'b1;
+    reg         CE_PIXEL_cga_ps = 1'b0;
+    reg         CE_PIXEL_cga_ps_d = 1'b0;
+    reg  [7:0]  VGA_R_cga_hdmi, VGA_G_cga_hdmi, VGA_B_cga_hdmi;
+    reg         VGA_HS_cga_hdmi, VGA_VS_cga_hdmi, VGA_DE_cga_hdmi;
+    reg         LHBL_cga_hdmi, LVBL_cga_hdmi;
+    reg         CE_PIXEL_cga_hdmi = 1'b0;
+
+    reg  [7:0]  VGA_R_hgc_src = 8'd0;
+    reg  [7:0]  VGA_G_hgc_src = 8'd0;
+    reg  [7:0]  VGA_B_hgc_src = 8'd0;
+    reg         VGA_HS_hgc_src = 1'b0;
+    reg         VGA_VS_hgc_src = 1'b0;
+    reg         VGA_DE_hgc_src = 1'b0;
+    reg         LHBL_hgc_src = 1'b1;
+    reg         credits_vb_hgc_src = 1'b1;
+    reg         CE_PIXEL_hgc_src = 1'b0;
+    reg  [7:0]  VGA_R_hgc_ps = 8'd0;
+    reg  [7:0]  VGA_G_hgc_ps = 8'd0;
+    reg  [7:0]  VGA_B_hgc_ps = 8'd0;
+    reg         VGA_HS_hgc_ps = 1'b0;
+    reg         VGA_VS_hgc_ps = 1'b0;
+    reg         VGA_DE_hgc_ps = 1'b0;
+    reg         LHBL_hgc_ps = 1'b1;
+    reg         credits_vb_hgc_ps = 1'b1;
+    reg         CE_PIXEL_hgc_ps = 1'b0;
+    reg         ce_pixel_hgc_prev = 1'b0;
+    reg         ce_pixel_hgc_tog = 1'b0;
+    reg         ce_pixel_hgc_tog_1 = 1'b0;
+    reg         ce_pixel_hgc_tog_2 = 1'b0;
+    wire        CE_PIXEL_hgc_sync;
+    reg  [7:0]  VGA_R_hgc_56 = 8'd0, VGA_G_hgc_56 = 8'd0, VGA_B_hgc_56 = 8'd0;
+    reg         VGA_HS_hgc_56 = 1'b0, VGA_VS_hgc_56 = 1'b0, VGA_DE_hgc_56 = 1'b0;
+    reg         LHBL_hgc_56 = 1'b1, credits_vb_hgc_56 = 1'b1;
+    reg         CE_PIXEL_hgc_hdmi = 1'b0;
+
+    assign CLK_VIDEO = clk_video_out_ps;
+    assign CLK_VIDEO_HGC = clk_114_544;
+    assign CLK_VIDEO_CGA = clk_57_272;
+    assign ce_pixel_hgc_raw = ce_pixel_hgc_div[1];
+
+    always @(posedge clk_114_544)
+        if (`ENABLE_HGC)
+            ce_pixel_hgc_div <= ce_pixel_hgc_div + 2'd1;
+        else
+            ce_pixel_hgc_div <= 2'd0;
+
+    always @(posedge clk_57_272)
+        ce_pixel_cga_2x <= ~ce_pixel_cga_2x;
 
     assign VGA_SL = {scale_video_ff==3, scale_video_ff==2};
 
-    wire   scandoubler = (scale_video_ff>0); //|| forced_scandoubler);
+    wire   scandoubler = video_scandoubler_en;
 
     reg [14:0] HBlank_del;
+    reg [24:0] HBlank_del_hgc;
     wire tandy_16_gfx;
+    wire tandy_color_16;
     wire color = (screen_mode_video_ff == 3'd0);
     
 	 wire HBlank_VGA;
 
     reg [10:0] HBlank_counter = 0;
+    reg [10:0] HBlank_counter_hgc = 0;
     reg HBlank_fixed = 1'b1;
+    reg HBlank_fixed_hgc = 1'b1;
     reg [1:0] HSync_del = 1'b11;
-
+    reg [1:0] HSync_del_hgc = 1'b11;
+    localparam integer MDA_VSYNC_DELAY = 19;
+    reg [MDA_VSYNC_DELAY:0] VSync_line;
     reg        video_pause_core_buf;
     reg        video_pause_core;
 
     always_comb
     begin
-        if (swap_video & ~tandy_mode)
-
-        HBlank_VGA = HBlank_del[color ? 12 : 13];
-
+        if (swap_video_eff)
+            HBlank_VGA = HBlank_del_hgc[24];
         else if (tandy_color_16)
-            HBlank_VGA = HBlank_del[color ? 11 : 13];
-
+            HBlank_VGA = HBlank_del[11];
         else if (tandy_16_gfx)
-            HBlank_VGA = HBlank_del[color ? 9 : 11];
-
-        else HBlank_VGA = HBlank_del[color ? 5 : 7];
+            HBlank_VGA = HBlank_del[9];
+        else
+            HBlank_VGA = HBlank_del[5];
     end
 
     always @ (posedge ce_pixel_cga)
@@ -1423,7 +1602,29 @@ module emu
         end
     end
 
-    always @ (posedge clk_56_875) begin
+    always @(posedge clk_57_272)
+    begin
+        if (swap_video_eff)
+        begin
+            HBlank_del_hgc <= {HBlank_del_hgc[23:0], HBlank};
+            HSync_del_hgc <= {HSync_del_hgc[0], HSync};
+            if (HSync_del_hgc == 2'b01)
+            begin
+                VSync_line <= {VSync_line[MDA_VSYNC_DELAY-1:0], VSync};
+                HBlank_counter_hgc <= 0;
+                HBlank_fixed_hgc <= 1'b1;
+            end
+            else
+            begin
+                if (HBlank_counter_hgc == (std_hsyncwidth ? 120 : 143))
+                    HBlank_fixed_hgc <= 1'b0;
+                else
+                    HBlank_counter_hgc <= HBlank_counter_hgc + 1;
+            end
+        end
+    end
+
+    always @ (posedge clk_video_out_ps) begin
         video_pause_core_buf    <= pause_core;
         video_pause_core        <= video_pause_core_buf;
     end
@@ -1431,7 +1632,7 @@ module emu
     video_monochrome_converter video_mono_cga 
 	(
 		.clk_vid(CLK_VIDEO_CGA),
-		.ce_pix(ce_pixel_cga),
+		.ce_pix(ce_pixel_cga_vid),
 
 		.R({r, 2'b00}),
 		.G({g, 2'b00}),
@@ -1447,11 +1648,11 @@ module emu
     video_monochrome_converter video_mono_hgc
 	(
 		.clk_vid(CLK_VIDEO_HGC),
-		.ce_pix(ce_pixel_hgc),
+		.ce_pix(ce_pixel_hgc_raw),
 
-		.R({r, 2'b00}),
-		.G({g, 2'b00}),
-		.B({b, 2'b00}),
+		.R({hgc_r_sync, 2'b00}),
+		.G({hgc_g_sync, 2'b00}),
+		.B({hgc_b_sync, 2'b00}),
 
 		.gfx_mode(screen_mode_video_ff),
 
@@ -1470,20 +1671,24 @@ module emu
     assign CE_PIXEL = ce_pixel;
     */
 
-    wire LHBL = (~swap_video && border_video_ff) ? HBlank_fixed : HBlank_VGA;
-    wire LVBL = (~swap_video && border_video_ff) ? std_hsyncwidth ? VGA_VBlank_border : ~VSync : VBlank;
+    wire LHBL = cga_scandouble_en ? HBlank :
+                ((border_video_ff) ? (swap_video_eff ? HBlank_fixed_hgc : HBlank_fixed) : HBlank_VGA);
+    wire LVBL = cga_scandouble_en ? VBlank :
+                ((border_video_ff) ? (std_hsyncwidth ? VGA_VBlank_border : VBlank) : VBlank);
+    wire VSync_hgc = VSync_line[MDA_VSYNC_DELAY];
 
     wire       pre2x_LHBL, pre2x_LVBL;
     wire [7:0] pre2x_r, pre2x_g, pre2x_b;
+    wire [23:0] credits_rgb_out;
 	 
 
-    video_mixer #(.GAMMA(1)) video_mixer_cga
+	video_mixer #(.GAMMA(1)) video_mixer_cga
 	(
 		.*,
 
 		.CLK_VIDEO(CLK_VIDEO_CGA),
 		.CE_PIXEL(CE_PIXEL_cga),
-		.ce_pix(ce_pixel_cga),
+		.ce_pix(ce_pixel_cga_vid),
 
 		.freeze_sync(),
 
@@ -1491,12 +1696,12 @@ module emu
 		.G(gaux_cga),
 		.B(baux_cga),
 
-		.HBlank(pre2x_LHBL),
-		.VBlank(pre2x_LVBL),
+		.HBlank(LHBL),
+		.VBlank(LVBL),
 		.HSync(HSync),
 		.VSync(VSync),
 
-		.scandoubler(scandoubler),
+		.scandoubler(1'b0),
 		.hq2x(scale_video_ff==1),
 		.gamma_bus(gamma_bus_cga),
 
@@ -1509,13 +1714,101 @@ module emu
 
 	);
 
+    always @(posedge clk_57_272)
+    begin
+        VGA_R_cga_src <= VGA_R_cga;
+        VGA_G_cga_src <= VGA_G_cga;
+        VGA_B_cga_src <= VGA_B_cga;
+        VGA_HS_cga_src <= VGA_HS_cga;
+        VGA_VS_cga_src <= VGA_VS_cga;
+        VGA_DE_cga_src <= VGA_DE_cga;
+        LHBL_cga_src <= LHBL;
+        LVBL_cga_src <= LVBL;
+        CE_PIXEL_cga_src <= CE_PIXEL_cga;
+    end
+
+    // Retimes the exact-frequency CGA output onto a phase-shifted sibling clock.
+    always @(posedge clk_video_out_ps or posedge video_retime_reset)
+    begin
+        if (video_retime_reset)
+        begin
+            VGA_R_cga_ps <= 8'd0;
+            VGA_G_cga_ps <= 8'd0;
+            VGA_B_cga_ps <= 8'd0;
+            VGA_HS_cga_ps <= 1'b0;
+            VGA_VS_cga_ps <= 1'b0;
+            VGA_DE_cga_ps <= 1'b0;
+            LHBL_cga_ps <= 1'b1;
+            LVBL_cga_ps <= 1'b1;
+            CE_PIXEL_cga_ps <= 1'b0;
+            CE_PIXEL_cga_ps_d <= 1'b0;
+            VGA_R_cga_hdmi <= 8'd0;
+            VGA_G_cga_hdmi <= 8'd0;
+            VGA_B_cga_hdmi <= 8'd0;
+            VGA_HS_cga_hdmi <= 1'b0;
+            VGA_VS_cga_hdmi <= 1'b0;
+            VGA_DE_cga_hdmi <= 1'b0;
+            LHBL_cga_hdmi <= 1'b1;
+            LVBL_cga_hdmi <= 1'b1;
+            CE_PIXEL_cga_hdmi <= 1'b0;
+        end
+        else
+        begin
+            CE_PIXEL_cga_hdmi <= CE_PIXEL_cga_ps & ~CE_PIXEL_cga_ps_d;
+            if (CE_PIXEL_cga_ps & ~CE_PIXEL_cga_ps_d)
+            begin
+                VGA_R_cga_hdmi <= VGA_R_cga_ps;
+                VGA_G_cga_hdmi <= VGA_G_cga_ps;
+                VGA_B_cga_hdmi <= VGA_B_cga_ps;
+                VGA_HS_cga_hdmi <= VGA_HS_cga_ps;
+                VGA_VS_cga_hdmi <= VGA_VS_cga_ps;
+                VGA_DE_cga_hdmi <= VGA_DE_cga_ps;
+                LHBL_cga_hdmi <= LHBL_cga_ps;
+                LVBL_cga_hdmi <= LVBL_cga_ps;
+            end
+
+            CE_PIXEL_cga_ps_d <= CE_PIXEL_cga_ps;
+            CE_PIXEL_cga_ps <= CE_PIXEL_cga_src;
+            VGA_R_cga_ps <= VGA_R_cga_src;
+            VGA_G_cga_ps <= VGA_G_cga_src;
+            VGA_B_cga_ps <= VGA_B_cga_src;
+            VGA_HS_cga_ps <= VGA_HS_cga_src;
+            VGA_VS_cga_ps <= VGA_VS_cga_src;
+            VGA_DE_cga_ps <= VGA_DE_cga_src;
+            LHBL_cga_ps <= LHBL_cga_src;
+            LVBL_cga_ps <= LVBL_cga_src;
+        end
+    end
+
+    always @(posedge clk_114_544)
+    begin
+        if (ce_pixel_hgc_raw)
+        begin
+            hgc_r_meta  <= r;
+            hgc_g_meta  <= g;
+            hgc_b_meta  <= b;
+            hgc_hs_meta <= HSync;
+            hgc_vs_meta <= VSync_hgc;
+            hgc_hb_meta <= HBlank;
+            hgc_vb_meta <= VBlank;
+
+            hgc_r_sync  <= hgc_r_meta;
+            hgc_g_sync  <= hgc_g_meta;
+            hgc_b_sync  <= hgc_b_meta;
+            hgc_hs_sync <= hgc_hs_meta;
+            hgc_vs_sync <= hgc_vs_meta;
+            hgc_hb_sync <= hgc_hb_meta;
+            hgc_vb_sync <= hgc_vb_meta;
+        end
+    end
+
     video_mixer #(.GAMMA(0)) video_mixer_hgc
 	(
 		.*,
 
 		.CLK_VIDEO(CLK_VIDEO_HGC),
 		.CE_PIXEL(CE_PIXEL_hgc),
-		.ce_pix(ce_pixel_hgc),
+		.ce_pix(ce_pixel_hgc_raw),
 
 		.freeze_sync(),
 
@@ -1523,10 +1816,10 @@ module emu
 		.G(gaux_hgc),
 		.B(baux_hgc),
 
-		.HBlank(pre2x_LHBL),
-		.VBlank(pre2x_LVBL),
-		.HSync(HSync),
-		.VSync(VSync),
+		.HBlank(hgc_hb_sync),
+		.VBlank(hgc_vb_sync),
+		.HSync(hgc_hs_sync),
+		.VSync(hgc_vs_sync),
 
 		.scandoubler(scandoubler),
 		.hq2x(scale_video_ff==1),
@@ -1541,35 +1834,115 @@ module emu
 
 	);
 
+    always @(posedge clk_114_544)
+    begin
+        ce_pixel_hgc_prev <= CE_PIXEL_hgc;
+        if (CE_PIXEL_hgc && ~ce_pixel_hgc_prev)
+            ce_pixel_hgc_tog <= ~ce_pixel_hgc_tog;
+    end
 
-    assign VGA_R_AUX  =  swap_video & ~tandy_mode ? VGA_R_hgc  : VGA_R_cga;
-    assign VGA_G_AUX  =  swap_video & ~tandy_mode ? VGA_G_hgc  : VGA_G_cga;
-    assign VGA_B_AUX  =  swap_video & ~tandy_mode ? VGA_B_hgc  : VGA_B_cga;
-    assign VGA_HS =  swap_video & ~tandy_mode ? VGA_HS_hgc : VGA_HS_cga;
-    assign VGA_VS =  swap_video & ~tandy_mode ? VGA_VS_hgc : VGA_VS_cga;
-    assign VGA_DE =  swap_video & ~tandy_mode ? VGA_DE_hgc : VGA_DE_cga;
-    assign gamma_bus =  swap_video & ~tandy_mode ? gamma_bus_hgc : gamma_bus_cga;
-    assign CE_PIXEL  =  swap_video & ~tandy_mode ? CE_PIXEL_hgc : CE_PIXEL_cga;
+    always @(posedge clk_57_272)
+    begin
+        ce_pixel_hgc_tog_1 <= ce_pixel_hgc_tog;
+        ce_pixel_hgc_tog_2 <= ce_pixel_hgc_tog_1;
+        CE_PIXEL_hgc_src <= CE_PIXEL_hgc_sync;
 
+        if (CE_PIXEL_hgc_sync)
+        begin
+            VGA_R_hgc_src <= VGA_R_hgc;
+            VGA_G_hgc_src <= VGA_G_hgc;
+            VGA_B_hgc_src <= VGA_B_hgc;
+            VGA_HS_hgc_src <= VGA_HS_hgc;
+            VGA_VS_hgc_src <= VGA_VS_hgc;
+            VGA_DE_hgc_src <= VGA_DE_hgc;
+            LHBL_hgc_src <= hgc_hb_sync;
+            credits_vb_hgc_src <= hgc_vb_sync;
+        end
+    end
 
+    assign CE_PIXEL_hgc_sync = ce_pixel_hgc_tog_1 ^ ce_pixel_hgc_tog_2;
 
+    // Retimes the HGC mixer output by exploiting the exact 2:1 relation between
+    // clk_114_544 and the phase-shifted clk_video_out_ps.
+    always @(posedge clk_video_out_ps or posedge video_retime_reset)
+    begin
+        if (video_retime_reset)
+        begin
+            VGA_R_hgc_ps <= 8'd0;
+            VGA_G_hgc_ps <= 8'd0;
+            VGA_B_hgc_ps <= 8'd0;
+            VGA_HS_hgc_ps <= 1'b0;
+            VGA_VS_hgc_ps <= 1'b0;
+            VGA_DE_hgc_ps <= 1'b0;
+            LHBL_hgc_ps <= 1'b1;
+            credits_vb_hgc_ps <= 1'b1;
+            CE_PIXEL_hgc_ps <= 1'b0;
+            VGA_R_hgc_56 <= 8'd0;
+            VGA_G_hgc_56 <= 8'd0;
+            VGA_B_hgc_56 <= 8'd0;
+            VGA_HS_hgc_56 <= 1'b0;
+            VGA_VS_hgc_56 <= 1'b0;
+            VGA_DE_hgc_56 <= 1'b0;
+            LHBL_hgc_56 <= 1'b1;
+            credits_vb_hgc_56 <= 1'b1;
+            CE_PIXEL_hgc_hdmi <= 1'b0;
+        end
+        else
+        begin
+            CE_PIXEL_hgc_hdmi <= CE_PIXEL_hgc_ps;
+            if (CE_PIXEL_hgc_ps)
+            begin
+                VGA_R_hgc_56 <= VGA_R_hgc_ps;
+                VGA_G_hgc_56 <= VGA_G_hgc_ps;
+                VGA_B_hgc_56 <= VGA_B_hgc_ps;
+                VGA_HS_hgc_56 <= VGA_HS_hgc_ps;
+                VGA_VS_hgc_56 <= VGA_VS_hgc_ps;
+                VGA_DE_hgc_56 <= VGA_DE_hgc_ps;
+                LHBL_hgc_56 <= LHBL_hgc_ps;
+                credits_vb_hgc_56 <= credits_vb_hgc_ps;
+            end
+
+            CE_PIXEL_hgc_ps <= CE_PIXEL_hgc_src;
+            VGA_R_hgc_ps <= VGA_R_hgc_src;
+            VGA_G_hgc_ps <= VGA_G_hgc_src;
+            VGA_B_hgc_ps <= VGA_B_hgc_src;
+            VGA_HS_hgc_ps <= VGA_HS_hgc_src;
+            VGA_VS_hgc_ps <= VGA_VS_hgc_src;
+            VGA_DE_hgc_ps <= VGA_DE_hgc_src;
+            LHBL_hgc_ps <= LHBL_hgc_src;
+            credits_vb_hgc_ps <= credits_vb_hgc_src;
+        end
+    end
+
+    assign VGA_R_AUX  =  swap_video_eff ? VGA_R_hgc_56   : VGA_R_cga_hdmi;
+    assign VGA_G_AUX  =  swap_video_eff ? VGA_G_hgc_56   : VGA_G_cga_hdmi;
+    assign VGA_B_AUX  =  swap_video_eff ? VGA_B_hgc_56   : VGA_B_cga_hdmi;
+    assign VGA_HS =  swap_video_eff ? VGA_HS_hgc_56 : VGA_HS_cga_hdmi;
+    assign VGA_VS =  swap_video_eff ? VGA_VS_hgc_56 : VGA_VS_cga_hdmi;
+    assign VGA_DE =  swap_video_eff ? VGA_DE_hgc_56 : VGA_DE_cga_hdmi;
+    assign gamma_bus =  swap_video_eff ? gamma_bus_hgc : gamma_bus_cga;
+    assign CE_PIXEL  =  swap_video_eff ? CE_PIXEL_hgc_hdmi : CE_PIXEL_cga_hdmi;
+    assign CE_PIXEL_CREDITS = swap_video_eff ? CE_PIXEL_hgc_hdmi : CE_PIXEL_cga_hdmi;
+    wire credits_hb = swap_video_eff ? LHBL_hgc_56 : LHBL_cga_hdmi;
+    wire credits_vb = swap_video_eff ? credits_vb_hgc_56 : LVBL_cga_hdmi;
+    wire credits_border = swap_video_eff ? 1'b0 : border_video_ff;
     jtframe_credits #(
         .PAGES  (4),
         .COLW   (8),
         .BLKPOL (1)
     ) u_credits(
         .rst        ( reset      ),
-        .clk        ( clk_56_875 ),
-        .pxl_cen    ( CE_PIXEL   ),
+        .clk        ( clk_video_out_ps ),
+        .pxl_cen    ( CE_PIXEL_CREDITS ),
 
         // input image
-        .HB         ( LHBL  ),
-        .VB         ( LVBL  ),
+        .HB         ( credits_hb  ),
+        .VB         ( credits_vb ),
         .rgb_in     ( { VGA_R_AUX, VGA_G_AUX, VGA_B_AUX } ),
         .rotate     ( 2'd0  ),
         .toggle     ( 1'b0  ),
         .fast_scroll( 1'b0  ),
-        .border     ( swap_video & ~tandy_mode ? 1'b0 : border_video_ff ),
+        .border     ( credits_border ),
 
         .vram_din   ( 8'h0  ),
         .vram_dout  (       ),
@@ -1581,8 +1954,11 @@ module emu
         // output image
         .HB_out     ( pre2x_LHBL      ),
         .VB_out     ( pre2x_LVBL      ),
-        .rgb_out    ( {VGA_R, VGA_G, VGA_B } )
+        .rgb_out    ( credits_rgb_out )
     );
+
+    assign {VGA_R, VGA_G, VGA_B} = credits_rgb_out;
 
 
 endmodule
+
