@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build with Quartus (Docker: raetro/quartus:mister)
+    name: "Build with Quartus (Docker: raetro/quartus:mister)"
     runs-on: ubuntu-latest
     container:
       image: raetro/quartus:mister
