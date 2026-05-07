@@ -8,9 +8,10 @@ module CHIPSET #(
         parameter clk_rate = 28'd50000000)
         (
         input   logic           clock,
-        input   logic           cpu_clock,
+        input   logic           cpu_ce_posedge,
+        input   logic           cpu_ce_negedge,
         input   logic           clk_sys,
-        input   logic           peripheral_clock,
+        input   logic           peripheral_ce,
         input   logic   [1:0]   clk_select,
         input   logic           reset,
         input   logic           sdram_reset,
@@ -24,6 +25,7 @@ module CHIPSET #(
         output  logic           interrupt_to_cpu,
         // SplashScreen
         input   logic           splashscreen,
+        input   logic           status0_clear,
         // VGA
         output  logic           std_hsyncwidth,
         input   logic           composite,
@@ -150,6 +152,7 @@ module CHIPSET #(
         input   logic           mgmt_write,
         input   logic   [15:0]  mgmt_writedata,
         input   logic   [1:0]   floppy_wp,
+        output  logic   [1:0]   fdd_present,
         output  logic   [1:0]   fdd_request,
         output  logic   [2:0]   ide0_request,
         // XTCTL DATA
@@ -163,10 +166,13 @@ module CHIPSET #(
         // Others
         output  logic           pause_core,
         input   logic           cga_hw,
+        input   logic           cga_scandouble_en,
         input   logic           hercules_hw,
         output  logic           swap_video,
         input   logic   [3:0]   crt_h_offset,
-        input   logic   [2:0]   crt_v_offset
+        input   logic   [2:0]   crt_v_offset,
+        input   logic   [2:0]   vsync_width_osd,
+        input   logic   [2:0]   hsync_width_osd
 
     );
 
@@ -223,7 +229,8 @@ module CHIPSET #(
     READY u_READY 
     (
         .clock                              (clock),
-        .cpu_clock                          (cpu_clock),
+        .cpu_ce_posedge                     (cpu_ce_posedge),
+        .cpu_ce_negedge                     (cpu_ce_negedge),
         .reset                              (reset),
         .processor_ready                    (processor_ready),
         .dma_ready                          (dma_ready),
@@ -239,7 +246,8 @@ module CHIPSET #(
     BUS_ARBITER u_BUS_ARBITER 
     (
         .clock                              (clock),
-        .cpu_clock                          (cpu_clock),
+        .cpu_ce_posedge                     (cpu_ce_posedge),
+        .cpu_ce_negedge                     (cpu_ce_negedge),
         .reset                              (reset),
         .cpu_address                        (cpu_address),
         .cpu_data_bus                       (cpu_data_bus),
@@ -282,9 +290,10 @@ module CHIPSET #(
     (
         .clock                              (clock),
         .clk_sys                            (clk_sys),
-        .cpu_clock                          (cpu_clock),
+        .cpu_ce_posedge                     (cpu_ce_posedge),
+        .cpu_ce_negedge                     (cpu_ce_negedge),
         .clk_uart                           (clk_uart),
-        .peripheral_clock                   (peripheral_clock),
+        .peripheral_ce                      (peripheral_ce),
         .clk_select                         (clk_select),
         .reset                              (reset),
         .interrupt_to_cpu                   (interrupt_to_cpu),
@@ -292,6 +301,7 @@ module CHIPSET #(
         .dma_chip_select_n                  (dma_chip_select_n),
         .dma_page_chip_select_n             (dma_page_chip_select_n),
         .splashscreen                       (splashscreen),
+        .status0_clear                      (status0_clear),
         .std_hsyncwidth                     (std_hsyncwidth),
         .composite                          (composite),
         .video_output                       (video_output),
@@ -379,6 +389,7 @@ module CHIPSET #(
         .mgmt_write                         (mgmt_write),
         .mgmt_writedata                     (mgmt_writedata),
         .floppy_wp                          (floppy_wp),
+        .fdd_present                        (fdd_present),
         .fdd_request                        (fdd_request),
         .ide0_request                       (ide0_request),
         .fdd_dma_req                        (fdd_dma_req),
@@ -387,10 +398,13 @@ module CHIPSET #(
         .xtctl                              (xtctl),
         .pause_core                         (pause_core),
         .cga_hw                             (cga_hw),
+        .cga_scandouble_en                  (cga_scandouble_en),
         .hercules_hw                        (hercules_hw),
         .swap_video                         (swap_video),
         .crt_h_offset                       (crt_h_offset),
-        .crt_v_offset                       (crt_v_offset)
+        .crt_v_offset                       (crt_v_offset),
+        .vsync_width_osd                    (vsync_width_osd),
+        .hsync_width_osd                    (hsync_width_osd)
     );
 
     RAM u_RAM 
