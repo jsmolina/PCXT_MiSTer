@@ -9,8 +9,6 @@ jobs:
   build:
     name: "Build with Quartus (Docker: raetro/quartus:mister)"
     runs-on: ubuntu-latest
-    container:
-      image: raetro/quartus:mister
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,10 +18,8 @@ jobs:
         run: |
           set -euo pipefail
           project_file=""
-          # Prefer explicit root names if present
           if [ -f "PCXT.qpf" ]; then project_file="PCXT.qpf"; fi
           if [ -f "PCXT.qsf" ]; then project_file="PCXT.qsf"; fi
-          # Fallback to any .qpf/.qsf in the repo root
           if [ -z "$project_file" ]; then
             project_file=$(ls *.qpf *.qsf 2>/dev/null | head -n1 || true)
           fi
@@ -39,7 +35,9 @@ jobs:
         run: |
           set -euo pipefail
           echo "Running Quartus compile for project: $PROJECT_NAME"
-          quartus_sh --flow compile "$PROJECT_NAME"
+          docker run --rm -v "${{ github.workspace }}:/work" -w /work \
+            raetro/quartus:mister \
+            sh -c "quartus_sh --flow compile \"$PROJECT_NAME\""
 
       - name: Find produced RBF(s)
         run: |
@@ -52,7 +50,6 @@ jobs:
             found=1
           fi
           if [ "$found" -eq 0 ]; then
-            # Fallback: find any output_files dir with .rbf
             while IFS= read -r f; do
               cp "$f" artifacts/ || true
               found=1
