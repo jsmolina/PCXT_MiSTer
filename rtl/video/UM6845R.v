@@ -45,24 +45,7 @@ module UM6845R
 	output    [13:0] MA,
 	output    [15:0] MA_FULL,
 	output     [4:0] RA,
-	output     [7:0] HC,
-	output     [6:0] VC,
-	output     [7:0] H_DISP_REG,
-	output     [4:0] V_MAXSCAN_REG,
 	output    [3:0] hsync_width,
-	output           status_vretrace,
-	output           status_not_displaying,
-	output           vert_blank_active,
-	output     [3:0] scanline_mod16_debug,
-	output     [3:0] vslines_debug,
-	output     [7:0] crtc_r10_debug,
-	output     [7:0] crtc_r11_debug,
-	output     [7:0] crtc_r12_debug,
-	output     [7:0] crtc_r13_debug,
-	output     [7:0] crtc_r14_debug,
-	output     [7:0] crtc_r17_debug,
-	output     [7:0] crtc_r15_debug,
-	output     [7:0] crtc_r16_debug,
 
 	input      [3:0] crt_h_offset,
 	input      [2:0] crt_v_offset,
@@ -94,27 +77,7 @@ assign FIELD = ~field & interlace[0];
 assign MA = row_addr_r[13:0];
 assign MA_FULL = row_addr_r;
 assign RA = line | (field & interlace[0]);
-assign HC = hcc;
-assign VC = row[6:0];
-assign H_DISP_REG = R1_h_displayed;
-assign V_MAXSCAN_REG = R9_v_max_line;
 assign hsync_width = R3_h_sync_width;
-// Match 86Box more closely: Input Status #1 bit 3 tracks the retrace window
-// opened at VSYNC start and closed a few scanlines later, not the whole
-// vertical blank interval.
-assign status_vretrace = CRTC_TYPE ? ega_status_vretrace : 1'b0;
-assign status_not_displaying = CRTC_TYPE ? (~hde | ega_vert_blank_active_r) : ~DE;
-assign vert_blank_active = CRTC_TYPE ? ega_vert_blank_active_r : ~vde;
-assign scanline_mod16_debug = ega_scanline_mod16;
-assign vslines_debug = ega_vslines;
-assign crtc_r10_debug = R16_v_sync_pos_e;
-assign crtc_r11_debug = R17_v_sync_end_e;
-assign crtc_r12_debug = R12_start_addr_h;
-assign crtc_r13_debug = R13_start_addr_l;
-assign crtc_r14_debug = R20_underline_loc_e;
-assign crtc_r17_debug = R23_mode_control_e;
-assign crtc_r15_debug = R21_v_blank_start_e;
-assign crtc_r16_debug = R22_v_blank_end_e;
 
 assign DE = de[R8_skew & ~{2{CRTC_TYPE}}];
 
@@ -168,6 +131,9 @@ wire [9:0] eff_v_sync_pos = ega_ext_timing ? ({R7_v_sync_pos[7], R7_v_sync_pos[2
 wire [9:0] eff_v_blank_start = ega_v_blank_start_valid ? {2'd0, R21_v_blank_start_e} : eff_v_displayed;
 wire [9:0] eff_v_blank_end = ega_v_blank_end_valid ? {2'd0, R22_v_blank_end_e} : 10'd0;
 wire [9:0] eff_v_sync_match = eff_v_sync_pos - (hres_mode ? 10'd1 : 10'd2);
+
+// Effective vsync width: OSD override (1-7) takes priority, 0 = use register/CRTC_TYPE default
+wire [3:0] eff_v_sync_width = |vsync_width_osd ? {1'b0, vsync_width_osd} : (CRTC_TYPE ? 4'd0 : R3_v_sync_width);
 
 reg [4:0] addr;
 always @(*) begin
@@ -415,10 +381,7 @@ end
 // Fixed-width HSYNC pulse shaping (for TV compatibility across 40/80-col modes)
 // Detect rising edge of hsync_raw and generate a fixed-width pulse in pixel clocks.
 reg hsync_raw_prev;
-always @(posedge CLOCK) begin
-	if(~nRESET) hsync_raw_prev <= 1'b0;
-	else hsync_raw_prev <= hsync_raw;
-end
+always @(posedge CLOCK) hsync_raw_prev <= hsync_raw;
 wire hsync_rising = hsync_raw & ~hsync_raw_prev;
 
 reg [6:0] hsync_fixed_cnt;
@@ -442,13 +405,8 @@ wire hsync_effective = (|hsync_width_osd & ~hres_mode) ? hsync_shaped : hsync_ra
 
 reg [121:0] hsync_delay_line;
 always @(posedge CLOCK) begin
-    if(~nRESET) begin
-        hsync_delay_line <= 122'd0;
-        HSYNC <= 1'b0;
-    end else begin
-        hsync_delay_line <= {hsync_delay_line[120:0], hsync_effective};
-        HSYNC <= hsync_delay_line[(hres_mode ? 60 : 120) - (crt_h_offset << (hres_mode ? 2 : 3))];
-    end
+    hsync_delay_line <= {hsync_delay_line[120:0], hsync_effective};
+    HSYNC <= hsync_delay_line[(hres_mode ? 60 : 120) - (crt_h_offset << (hres_mode ? 2 : 3))];
 end
 
 reg vsync_raw;

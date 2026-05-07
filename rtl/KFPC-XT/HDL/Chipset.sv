@@ -26,7 +26,6 @@ module CHIPSET #(
         // SplashScreen
         input   logic           splashscreen,
         input   logic           status0_clear,
-        output  logic           cga_clear_busy,
         // VGA
         output  logic           std_hsyncwidth,
         input   logic           composite,
@@ -167,7 +166,6 @@ module CHIPSET #(
         // Others
         output  logic           pause_core,
         input   logic           cga_hw,
-        input   logic           ega_enabled,
         input   logic           cga_scandouble_en,
         input   logic           hercules_hw,
         output  logic           swap_video,
@@ -306,7 +304,6 @@ module CHIPSET #(
         .dma_page_chip_select_n             (dma_page_chip_select_n),
         .splashscreen                       (splashscreen),
         .status0_clear                      (status0_clear),
-        .cga_clear_busy                     (cga_clear_busy),
         .std_hsyncwidth                     (std_hsyncwidth),
         .composite                          (composite),
         .video_output                       (video_output),
@@ -406,7 +403,6 @@ module CHIPSET #(
         .xtctl                              (xtctl),
         .pause_core                         (pause_core),
         .cga_hw                             (cga_hw),
-        .ega_enabled                        (ega_enabled),
         .cga_scandouble_en                  (cga_scandouble_en),
         .hercules_hw                        (hercules_hw),
         .swap_video                         (swap_video),
