@@ -1,0 +1,74 @@
+name: Build Quartus RBF
+
+on:
+  push:
+    branches:
+      - 'ega-test'
+
+jobs:
+  build:
+    name: Build with Quartus (Docker: raetro/quartus:mister)
+    runs-on: ubuntu-latest
+    container:
+      image: raetro/quartus:mister
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect Quartus project file
+        id: detect
+        run: |
+          set -euo pipefail
+          project_file=""
+          # Prefer explicit root names if present
+          if [ -f "PCXT.qpf" ]; then project_file="PCXT.qpf"; fi
+          if [ -f "PCXT.qsf" ]; then project_file="PCXT.qsf"; fi
+          # Fallback to any .qpf/.qsf in the repo root
+          if [ -z "$project_file" ]; then
+            project_file=$(ls *.qpf *.qsf 2>/dev/null | head -n1 || true)
+          fi
+          if [ -z "$project_file" ]; then
+            echo "No .qpf or .qsf project file found at repo root." >&2
+            exit 1
+          fi
+          project_name="${project_file%.*}"
+          echo "Detected project file: $project_file -> project name: $project_name"
+          echo "PROJECT_NAME=$project_name" >> $GITHUB_ENV
+
+      - name: Build project with Quartus
+        run: |
+          set -euo pipefail
+          echo "Running Quartus compile for project: $PROJECT_NAME"
+          quartus_sh --flow compile "$PROJECT_NAME"
+
+      - name: Find produced RBF(s)
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          echo "Looking for .rbf files under ${PROJECT_NAME}/output_files and other output_files folders..."
+          found=0
+          if compgen -G "${PROJECT_NAME}/output_files/*.rbf" >/dev/null 2>&1; then
+            cp "${PROJECT_NAME}/output_files/"*.rbf artifacts/ || true
+            found=1
+          fi
+          if [ "$found" -eq 0 ]; then
+            # Fallback: find any output_files dir with .rbf
+            while IFS= read -r f; do
+              cp "$f" artifacts/ || true
+              found=1
+            done < <(find . -path "*/output_files/*.rbf" -print 2>/dev/null)
+          fi
+          if [ "$found" -eq 0 ]; then
+            echo "No .rbf files found after build." >&2
+            ls -R . || true
+            exit 1
+          fi
+          echo "Copied RBF(s) to artifacts/:"
+          ls -l artifacts || true
+
+      - name: Upload RBF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-rbf
+          path: artifacts/*.rbf
+          retention-days: 7
